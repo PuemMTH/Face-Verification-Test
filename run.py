@@ -230,6 +230,6 @@ def process_images(folder_path, output_base_dir):
     return results
 
 # Example usage
-folder_path = r"Error"
+folder_path = r"assest"
 output_base_dir = "output"
 results = process_images(folder_path, output_base_dir)
