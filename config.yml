@@ -1,0 +1,12 @@
+madiepipe:
+  static_image_mode: TRUE
+  max_num_faces: 10
+  min_detection_confidence: 0.6
+threshold:
+  face_size: 150
+  blur: 100
+  EAR_THRESHOLD: 0.37
+  dark_threshold: 35
+  bright_threshold: 200
+  diff_threshold: 20
+  margin: 0.1
