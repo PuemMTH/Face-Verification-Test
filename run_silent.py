@@ -17,7 +17,7 @@ from run import process_images
 
 def main():
     """Main function to run the face verification test silently"""
-    folder_path = "test"
+    folder_path = "/project/lt200384-ff_bio/datasets/ff_mix_crop"
     
     if not os.path.exists(folder_path):
         print(f"Error: {folder_path} directory not found")

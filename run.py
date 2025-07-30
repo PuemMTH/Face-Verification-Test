@@ -21,6 +21,36 @@ from pandas import ExcelWriter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import threading
+import csv
+
+def save_results_incrementally(results, timing_results, output_base_dir, timing_totals):
+    """Save results to CSV files incrementally"""
+    # Save main results
+    df_results = pd.DataFrame(results, columns=["image_name", "face_message", "eye_message", "light_message", "blur_message", "head_fully_message", "head_pose_message"])
+    df_results.to_csv(os.path.join(output_base_dir, "results.csv"), index=False)
+    
+    # Save timing per image
+    df_timing = pd.DataFrame(timing_results, columns=[
+        "image_name",
+        "get_lm_time",
+        "check_face_min_size_time",
+        "check_eye_status_time",
+        "check_lightpol_time",
+        "check_face_blur_time",
+        "check_head_fully_time",
+        "check_head_pose_time"
+    ])
+    df_timing.to_csv(os.path.join(output_base_dir, "timing_per_image.csv"), index=False)
+    
+    # Calculate and save summary
+    total_all_functions = sum(timing_totals.values())
+    summary_data = [
+        {"Function": func, "Total_Time_Seconds": total}
+        for func, total in timing_totals.items()
+    ]
+    summary_data.append({"Function": "Total_All_Functions", "Total_Time_Seconds": total_all_functions})
+    df_summary = pd.DataFrame(summary_data)
+    df_summary.to_csv(os.path.join(output_base_dir, "summary.csv"), index=False)
 
 def process_single_image(image_path, config):
     """Process a single image and return results and timing"""
@@ -112,7 +142,7 @@ def process_single_image(image_path, config):
     return result, timing
 
 def process_images(folder_path, output_base_dir, max_workers=4):
-    """Process all images in the input folder and its subfolders using multi-threading"""
+    """Process all images in the input folder and its subfolders using multi-threading with incremental saving"""
     # Load config from yml file
     with open("config.yml", "r") as file:
         config = yaml.safe_load(file)
@@ -141,11 +171,37 @@ def process_images(folder_path, output_base_dir, max_workers=4):
         "check_head_pose": 0.0
     }
     
+    # Thread lock for safe file writing
+    file_lock = threading.Lock()
+    
+    def process_and_save(image_path):
+        """Process single image and save results immediately"""
+        result, timing = process_single_image(image_path, config)
+        
+        # Update timing totals
+        with file_lock:
+            timing_totals["get_lm"] += timing["get_lm_time"]
+            timing_totals["check_face_min_size"] += timing["check_face_min_size_time"]
+            timing_totals["check_eye_status"] += timing["check_eye_status_time"]
+            timing_totals["check_lightpol"] += timing["check_lightpol_time"]
+            timing_totals["check_face_blur"] += timing["check_face_blur_time"]
+            timing_totals["check_head_fully"] += timing["check_head_fully_time"]
+            timing_totals["check_head_pose"] += timing["check_head_pose_time"]
+            
+            results.append(result)
+            timing_results.append(timing)
+            
+            # Save results incrementally every 10 images or immediately for small batches
+            if len(results) % 10 == 0 or len(results) == len(image_files):
+                save_results_incrementally(results, timing_results, output_base_dir, timing_totals)
+        
+        return result, timing
+    
     # Process images with multi-threading and progress bar
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
         future_to_image = {
-            executor.submit(process_single_image, image_path, config): image_path 
+            executor.submit(process_and_save, image_path): image_path 
             for image_path in image_files
         }
         
@@ -154,53 +210,14 @@ def process_images(folder_path, output_base_dir, max_workers=4):
                   unit="image") as pbar:
             for future in as_completed(future_to_image):
                 try:
-                    result, timing = future.result()
-                    results.append(result)
-                    timing_results.append(timing)
-                    
-                    # Update timing totals
-                    timing_totals["get_lm"] += timing["get_lm_time"]
-                    timing_totals["check_face_min_size"] += timing["check_face_min_size_time"]
-                    timing_totals["check_eye_status"] += timing["check_eye_status_time"]
-                    timing_totals["check_lightpol"] += timing["check_lightpol_time"]
-                    timing_totals["check_face_blur"] += timing["check_face_blur_time"]
-                    timing_totals["check_head_fully"] += timing["check_head_fully_time"]
-                    timing_totals["check_head_pose"] += timing["check_head_pose_time"]
-                    
+                    future.result()
                     pbar.update(1)
                 except Exception as e:
                     print(f"Error processing {future_to_image[future]}: {str(e)}")
                     pbar.update(1)
     
-    # Calculate total time across all functions
-    total_all_functions = sum(timing_totals.values())
-    
-    # Save results to CSV files
-    # Main results
-    df_results = pd.DataFrame(results, columns=["image_name", "face_message", "eye_message", "light_message", "blur_message", "head_fully_message", "head_pose_message"])
-    df_results.to_csv(os.path.join(output_base_dir, "results.csv"), index=False)
-    
-    # Timing per image
-    df_timing = pd.DataFrame(timing_results, columns=[
-        "image_name",
-        "get_lm_time",
-        "check_face_min_size_time",
-        "check_eye_status_time",
-        "check_lightpol_time",
-        "check_face_blur_time",
-        "check_head_fully_time",
-        "check_head_pose_time"
-    ])
-    df_timing.to_csv(os.path.join(output_base_dir, "timing_per_image.csv"), index=False)
-    
-    # Summary of total time per function
-    summary_data = [
-        {"Function": func, "Total_Time_Seconds": total}
-        for func, total in timing_totals.items()
-    ]
-    summary_data.append({"Function": "Total_All_Functions", "Total_Time_Seconds": total_all_functions})
-    df_summary = pd.DataFrame(summary_data)
-    df_summary.to_csv(os.path.join(output_base_dir, "summary.csv"), index=False)
+    # Final save to ensure all results are written
+    save_results_incrementally(results, timing_results, output_base_dir, timing_totals)
     
     return results
 
