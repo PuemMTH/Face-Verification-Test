@@ -31,4 +31,5 @@ protobuf==4.25.8
  setuptools==65.5.0 
  six==1.17.0 
  sounddevice==0.5.2 
+ tqdm==4.66.1
  tzdata==2025.2

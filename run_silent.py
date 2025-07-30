@@ -1,57 +1,57 @@
 #!/usr/bin/env python3
-import subprocess
-import sys
-import os
+"""
+Silent version of run.py for testing multi-threading functionality
+"""
 
-def run_silent():
-    """Run the main script with all warnings and errors suppressed"""
+import os
+import sys
+import logging
+
+# Suppress all logging
+logging.basicConfig(level=logging.CRITICAL)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow warnings
+os.environ['GLOG_minloglevel'] = '3'  # Suppress MediaPipe INFO and WARNING logs
+
+# Import the main run module
+from run import process_images
+
+def main():
+    """Main function to run the face verification test silently"""
+    folder_path = "test"
     
-    # Set environment variables to suppress all output
-    env = os.environ.copy()
-    env.update({
-        'TF_CPP_MIN_LOG_LEVEL': '3',
-        'GLOG_minloglevel': '3',
-        'CUDA_VISIBLE_DEVICES': '-1',
-        'TF_ENABLE_ONEDNN_OPTS': '0',
-        'ABSL_LOGGING_MIN_LEVEL': '3',
-        'TF_ENABLE_DEPRECATION_WARNINGS': '0',
-        'TF_LOGGING_LEVEL': '3',
-        'GLOG_logtostderr': '0',
-        'PYTHONWARNINGS': 'ignore',
-        'TF_ENABLE_GPU_GARBAGE_COLLECTION': '0',
-        'TF_FORCE_GPU_ALLOW_GROWTH': 'false'
-    })
+    if not os.path.exists(folder_path):
+        print(f"Error: {folder_path} directory not found")
+        sys.exit(1)
     
-    # Run the main script with output redirected
-    try:
-        result = subprocess.run([
-            sys.executable, 'run.py'
-        ], 
-        env=env,
-        capture_output=True,
-        text=True,
-        check=True
-        )
+    folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
+    
+    if not folders:
+        print(f"No folders found in {folder_path}")
+        sys.exit(1)
+    
+    print(f"Processing {len(folders)} folders with multi-threading...")
+    
+    total_images = 0
+    for folder in folders:
+        folder_full_path = os.path.join(folder_path, folder)
+        os.makedirs(f"output/{folder}", exist_ok=True)
+        output_base_dir = f"output/{folder}/"
         
-        # Print only the essential progress messages
-        lines = result.stdout.split('\n')
-        for line in lines:
-            if any(keyword in line for keyword in [
-                'Starting face verification test',
-                'Processing folder:',
-                'Processing:',
-                'Results saved to',
-                'Completed processing',
-                'All folders processed successfully'
-            ]):
-                print(line)
-                
-    except subprocess.CalledProcessError as e:
-        print(f"Error running script: {e}")
-        if e.stdout:
-            print("Output:", e.stdout)
-        if e.stderr:
-            print("Error:", e.stderr)
+        # Count images in this folder
+        image_count = 0
+        for root, _, files in os.walk(folder_full_path):
+            for filename in files:
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    image_count += 1
+        
+        total_images += image_count
+        print(f"Folder '{folder}': {image_count} images")
+        
+        # Process the folder
+        results = process_images(folder_full_path, output_base_dir, max_workers=4)
+        print(f"  Completed: {len(results)} images processed")
+    
+    print(f"\nTotal processing complete: {total_images} images across {len(folders)} folders")
 
 if __name__ == "__main__":
-    run_silent() 
+    main() 
