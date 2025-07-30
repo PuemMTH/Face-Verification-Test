@@ -19,45 +19,11 @@ from func.check_head_fully import analyze_single_image
 import time
 from pandas import ExcelWriter
 
-def create_output_folders(output_base_dir):
-    """Create output directory structure for check_face_min_size, check_eye_status, and check_lightpol"""
-    # Create check_face_min_size folders
-    face_path = os.path.join(output_base_dir, "check_face_min_size")
-    os.makedirs(os.path.join(face_path, "Pass"), exist_ok=True)
-    os.makedirs(os.path.join(face_path, "Not_pass"), exist_ok=True)
-    
-    # Create check_eye_status folders
-    eye_path = os.path.join(output_base_dir, "check_eye_status")
-    os.makedirs(os.path.join(eye_path, "open_eye"), exist_ok=True)
-    os.makedirs(os.path.join(eye_path, "close_eye"), exist_ok=True)
-    
-    # Create check_lightpol folders
-    light_path = os.path.join(output_base_dir, "check_lightpol")
-    for status in ["normal", "too_dark", "too_bright", "backlight", "no_face"]:
-        os.makedirs(os.path.join(light_path, status), exist_ok=True)
-        
-    blur_path = os.path.join(output_base_dir, "check_face_blur")
-    for status in ["Image is blurry", "Image isn't blurry"]:
-        os.makedirs(os.path.join(blur_path, status), exist_ok=True)
-        
-    head_fully_path = os.path.join(output_base_dir, "check_head_fully")
-    for status in ["Top of head and chin might be cut", "Top of head might be cut","Chin might be cut","Head is fully visible","No face detected"]:
-        os.makedirs(os.path.join(head_fully_path, status), exist_ok=True)
-        
-    head_pose_path = os.path.join(output_base_dir, "check_head_pose")
-    for status in ["Looking Left", "Looking Right","Looking Down","Looking Up","Tilting Left","Tilting Right","Forward","No face detected"]:
-        os.makedirs(os.path.join(head_pose_path, status), exist_ok=True)
-    
-    return face_path, eye_path, light_path, blur_path, head_fully_path, head_pose_path
-
 def process_images(folder_path, output_base_dir):
     """Process all images in the input folder and its subfolders for check_face_min_size, check_eye_status, and check_lightpol"""
     # Load config from yml file
     with open("config.yml", "r") as file:
         config = yaml.safe_load(file)
-    
-    # Create output directory structure
-    face_path, eye_path, light_path, blur_path, head_fully_path, head_pose_path = create_output_folders(output_base_dir)
     
     results = []
     timing_results = []
@@ -111,22 +77,12 @@ def process_images(folder_path, output_base_dir):
                 timing_totals["check_face_min_size"] += timing["check_face_min_size_time"]
                 result["face_message"] = face_message
                 
-                # Copy to Pass or Not_pass folder
-                face_dest_folder = os.path.join(face_path, "Pass" if face_success else "Not_pass")
-                face_dest_path = os.path.join(face_dest_folder, filename)
-                shutil.copy(image_path, face_dest_path)
-                
                 # Check eye status
                 start_time = time.time()
                 eye_success, eye_message = check_eye_status(landmarks, success, msg, config['threshold']['EAR_THRESHOLD'])
                 timing["check_eye_status_time"] = time.time() - start_time
                 timing_totals["check_eye_status"] += timing["check_eye_status_time"]
                 result["eye_message"] = eye_message
-                
-                # Copy to open_eye or close_eye folder
-                eye_dest_folder = os.path.join(eye_path, "open_eye" if eye_success else "close_eye")
-                eye_dest_path = os.path.join(eye_dest_folder, filename)
-                shutil.copy(image_path, eye_dest_path)
                 
                 # Check lighting
                 start_time = time.time()
@@ -141,11 +97,6 @@ def process_images(folder_path, output_base_dir):
                 timing_totals["check_lightpol"] += timing["check_lightpol_time"]
                 result["light_message"] = light_status
                 
-                # Copy to appropriate light status folder
-                light_dest_folder = os.path.join(light_path, light_status)
-                light_dest_path = os.path.join(light_dest_folder, filename)
-                shutil.copy(image_path, light_dest_path)
-                
                 # Check face blur
                 start_time = time.time()
                 blur_success, blur_status = check_face_blur(
@@ -156,22 +107,12 @@ def process_images(folder_path, output_base_dir):
                 timing_totals["check_face_blur"] += timing["check_face_blur_time"]
                 result["blur_message"] = blur_status
                 
-                # Copy to appropriate blur status folder
-                blur_dest_folder = os.path.join(blur_path, blur_status)
-                blur_dest_path = os.path.join(blur_dest_folder, filename)
-                shutil.copy(image_path, blur_dest_path)
-                
                 # Check head fully
                 start_time = time.time()
                 head_fully_success, head_fully_status = analyze_single_image(image_path)
                 timing["check_head_fully_time"] = time.time() - start_time
                 timing_totals["check_head_fully"] += timing["check_head_fully_time"]
                 result["head_fully_message"] = head_fully_status
-                
-                # Copy to appropriate head fully status folder
-                head_fully_dest_folder = os.path.join(head_fully_path, head_fully_status)
-                head_fully_dest_path = os.path.join(head_fully_dest_folder, filename)
-                shutil.copy(image_path, head_fully_dest_path)
                 
                 # Check head pose
                 start_time = time.time()
@@ -186,11 +127,6 @@ def process_images(folder_path, output_base_dir):
                 timing_totals["check_head_pose"] += timing["check_head_pose_time"]
                 result["head_pose_message"] = head_pose_status
                 
-                # Copy to appropriate head pose status folder
-                head_pose_dest_folder = os.path.join(head_pose_path, head_pose_status)
-                head_pose_dest_path = os.path.join(head_pose_dest_folder, filename)
-                shutil.copy(image_path, head_pose_dest_path)
-                
                 results.append(result)
                 timing_results.append(timing)
     
@@ -198,38 +134,40 @@ def process_images(folder_path, output_base_dir):
     # Calculate total time across all functions
     total_all_functions = sum(timing_totals.values())
     
-    # Save results to Excel with multiple sheets
-    excel_path = os.path.join(output_base_dir, "results.xlsx")
-    with ExcelWriter(excel_path, engine='openpyxl') as writer:
-        # Sheet 1: Main results
-        df_results = pd.DataFrame(results, columns=["image_name", "face_message", "eye_message", "light_message", "blur_message", "head_fully_message", "head_pose_message"])
-        df_results.to_excel(writer, sheet_name="Results", index=False)
-        
-        # Sheet 2: Timing per image
-        df_timing = pd.DataFrame(timing_results, columns=[
-            "image_name",
-            "get_lm_time",
-            "check_face_min_size_time",
-            "check_eye_status_time",
-            "check_lightpol_time",
-            "check_face_blur_time",
-            "check_head_fully_time",
-            "check_head_pose_time"
-        ])
-        df_timing.to_excel(writer, sheet_name="Timing_Per_Image", index=False)
-        
-        # Sheet 3: Summary of total time per function
-        summary_data = [
-            {"Function": func, "Total_Time_Seconds": total}
-            for func, total in timing_totals.items()
-        ]
-        summary_data.append({"Function": "Total_All_Functions", "Total_Time_Seconds": total_all_functions})
-        df_summary = pd.DataFrame(summary_data)
-        df_summary.to_excel(writer, sheet_name="Timing_Summary", index=False)
+    # Save results to CSV files
+    # Main results
+    df_results = pd.DataFrame(results, columns=["image_name", "face_message", "eye_message", "light_message", "blur_message", "head_fully_message", "head_pose_message"])
+    df_results.to_csv(os.path.join(output_base_dir, "results.csv"), index=False)
+    
+    # Timing per image
+    df_timing = pd.DataFrame(timing_results, columns=[
+        "image_name",
+        "get_lm_time",
+        "check_face_min_size_time",
+        "check_eye_status_time",
+        "check_lightpol_time",
+        "check_face_blur_time",
+        "check_head_fully_time",
+        "check_head_pose_time"
+    ])
+    df_timing.to_csv(os.path.join(output_base_dir, "timing_per_image.csv"), index=False)
+    
+    # Summary of total time per function
+    summary_data = [
+        {"Function": func, "Total_Time_Seconds": total}
+        for func, total in timing_totals.items()
+    ]
+    summary_data.append({"Function": "Total_All_Functions", "Total_Time_Seconds": total_all_functions})
+    df_summary = pd.DataFrame(summary_data)
+    df_summary.to_csv(os.path.join(output_base_dir, "summary.csv"), index=False)
     
     return results
 
 # Example usage
-folder_path = r"assest"
-output_base_dir = "output"
-results = process_images(folder_path, output_base_dir)
+folder_path = r"test"
+for folder in os.listdir(folder_path):
+    folder_full_path = os.path.join(folder_path, folder)
+    if os.path.isdir(folder_full_path):  # Only process directories
+        os.makedirs(f"output/{folder}", exist_ok=True)
+        output_base_dir = f"output/{folder}/"
+        results = process_images(folder_full_path, output_base_dir)

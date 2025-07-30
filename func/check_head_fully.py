@@ -1,13 +1,18 @@
 import cv2
 import mediapipe as mp
+import yaml
+
+# โหลดค่า config จากไฟล์ yml
+with open("config.yml", "r") as file:
+    config = yaml.safe_load(file)
 
 def is_top_of_head_cut(landmarks, image_height):
     top_y = landmarks[10].y * image_height
-    return top_y < 10
+    return top_y <  config['threshold']['head_fully_th']
 
 def is_chin_cut(landmarks, image_height):
     chin_y = landmarks[152].y * image_height
-    return chin_y > image_height - 10
+    return chin_y > image_height - config['threshold']['head_fully_th']
 
 def analyze_single_image(image_path):
     mp_face_mesh = mp.solutions.face_mesh

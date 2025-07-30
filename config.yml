@@ -4,9 +4,16 @@ madiepipe:
   min_detection_confidence: 0.6
 threshold:
   face_size: 150
-  blur: 100
-  EAR_THRESHOLD: 0.37
+  blur: 90
   dark_threshold: 35
   bright_threshold: 200
   diff_threshold: 20
   margin: 0.1
+  head_fully_th: 10
+  EAR_THRESHOLD: 0.37
+  left_th: -0.3
+  right_th: 0.3
+  down_th: -10
+  up_th: 15
+  til_left_th: -0.10
+  til_right_th: 0.10

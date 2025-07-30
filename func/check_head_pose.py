@@ -2,6 +2,13 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import os
+import yaml
+
+# โหลดค่า config จากไฟล์ yml
+with open("config.yml", "r") as file:
+    config = yaml.safe_load(file)
+
+
 
 def check_head_pose(image_path):
     # ตั้งค่า MediaPipe
@@ -71,22 +78,22 @@ def check_head_pose(image_path):
             
 
             # ตรวจสอบทิศทางศีรษะ
-            if yaw < -3:
+            if yaw < config['threshold']['left_th']:
                 success = False
                 direction = "Looking Left"
-            elif yaw > 3:
+            elif yaw > config['threshold']['right_th']:
                 success = False
                 direction = "Looking Right"
-            elif pitch < -10:
+            elif pitch < config['threshold']['down_th']:
                 success = False
                 direction = "Looking Down"
-            elif pitch > 15:
+            elif pitch > config['threshold']['up_th']:
                 success = False
                 direction = "Looking Up"
-            elif roll < -0.10:
+            elif roll < config['threshold']['til_left_th']:
                 success = False
                 direction = "Tilting Left"
-            elif roll > 0.10:
+            elif roll > config['threshold']['til_right_th']:
                 success = False
                 direction = "Tilting Right"
             else:
@@ -99,4 +106,4 @@ def check_head_pose(image_path):
             return result
 
     face_mesh.close()
-    return "No face detected"
+    return "Error: No face detected"

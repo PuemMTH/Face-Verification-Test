@@ -2,3 +2,5 @@ Error
 .venv
 output
 *.pyc
+func/__pycache__
+test
