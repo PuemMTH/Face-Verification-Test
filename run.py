@@ -206,7 +206,7 @@ def process_images(folder_path, output_base_dir, max_workers=4):
 
 # Example usage with multi-threading and progress tracking
 if __name__ == "__main__":
-    folder_path = r"test"
+    folder_path = r"/project/lt200384-ff_bio/datasets/ff_mix_crop"
     folders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
     
     print(f"Found {len(folders)} folders to process")
